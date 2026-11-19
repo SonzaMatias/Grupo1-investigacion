@@ -17,7 +17,7 @@ class SolicitudCalificar(BaseModel):
 # =====================================================================
 @app.post("/calificaciones", status_code=status.HTTP_202_ACCEPTED, summary="1. Registrar calificación CON Outbox (Seguro)")
 def registrar_calificacion(solicitud: SolicitudCalificar):
-    print(f"[PASO 1 - HTTP -> API M2] Solicitud POST recibida de '{solicitud.cliente}' ({solicitud.puntaje} estrellas).")
+    print(f"\n[PASO 1 - HTTP -> API M2] Solicitud POST recibida de '{solicitud.cliente}' ({solicitud.puntaje} estrellas).")
     try:
         with transaccion_bd() as cursor:
             # 1A. Guardar entidad de negocio en el esquema de M2

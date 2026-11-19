@@ -84,7 +84,7 @@ def procesar_mensaje(canal, method, properties, body):
 
         # 4B. Confirmación manual a RabbitMQ recién después del COMMIT en M3
         canal.basic_ack(delivery_tag=method.delivery_tag)
-        log_flujo(calificacion_id, "PASO 4", "WORKER M3 -> BROKER", "Señal ACK enviada a RabbitMQ. Ciclo completado.")
+        log_flujo(calificacion_id, "PASO 4", "WORKER M3 -> BROKER", "Señal ACK enviada a RabbitMQ. Ciclo completado.\n")
 
     except Exception as error:
         log_flujo(calificacion_id, "ERROR", "WORKER M3", f"Fallo transitorio en BD M3 ({type(error).__name__}). Esperando 3s antes de NACK con requeue...")
