@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de la demo · Colas y Outbox</title>
+<style>
+  :root {
+    --bg: #F3F5F8; --surface: #FFFFFF; --ink: #14213D; --muted: #5A6578; --line: #CBD3DF;
+    --m2: #2F6FB0; --m2-soft: #E2ECF7; --cola: #B5541C; --cola-soft: #F8E7DC; --m3: #2E7D4F; --m3-soft: #DDF0E4;
+    --amber: #9A6212; --amber-soft: #FBEFD9; --bad: #B42318; --bad-soft: #FBE3E0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 20px 40px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { margin: 0; font-size: 1.5rem; }
+  h2 { margin: 0; font-size: 1.15rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 9px 14px; font-weight: 600; }
+  button:hover { border-color: var(--ink); }
+  button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pri { background: var(--m2); border-color: var(--m2); color: #fff; }
+  .acciones .peligro { margin-left: auto; color: var(--bad); border-color: var(--bad); }
+  .acciones .peligro.confirmar { background: var(--bad); color: #fff; }
+  .switch[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #fff; }
+
+  .pausa { border: 2px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .pausa.activa { border-color: var(--amber); background: var(--amber-soft); }
+  .pausa .fila { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .pausa .num { font-weight: 700; color: var(--amber); white-space: nowrap; }
+  .pausa .desc { flex: 1; min-width: 240px; font-size: 1.15rem; font-weight: 600; }
+  .avanzar { background: var(--amber); border-color: var(--amber); color: #fff; font-size: 1.05rem; }
+  .apagado { color: var(--muted); }
+
+  .veredicto { border-radius: 12px; padding: 12px 16px; font-weight: 600; display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+  .veredicto.ok { background: var(--m3-soft); color: var(--m3); }
+  .veredicto.espera { background: var(--amber-soft); color: var(--amber); }
+  .veredicto.mal { background: var(--bad-soft); color: var(--bad); }
+  .veredicto .nums { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+
+  .columnas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 860px) { .columnas { grid-template-columns: 1fr; } }
+  .col { background: var(--surface); border: 1px solid var(--line); border-top: 6px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .col.m2 { border-top-color: var(--m2); } .col.cola { border-top-color: var(--cola); } .col.m3 { border-top-color: var(--m3); }
+  .col.caido { background: var(--bad-soft); border-color: var(--bad); }
+  .pill { font-size: .75rem; padding: 2px 9px; border-radius: 999px; background: var(--m3-soft); color: var(--m3); }
+  .col.caido .pill { background: var(--bad); color: #fff; }
+  .kv { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+  .kv b { font-size: 1.25rem; }
+  .sub { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+  .lista { display: flex; flex-direction: column; gap: 4px; }
+  .ev { display: flex; justify-content: space-between; gap: 8px; font: .92rem ui-monospace, Consolas, monospace; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); }
+  .ev.PENDIENTE { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+  .ev.PUBLICADO { background: var(--m2-soft); border-color: var(--m2); color: var(--m2); }
+  .grande { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .cola-num { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center; }
+  .cola-num div { background: var(--cola-soft); border-radius: 10px; padding: 12px 6px; }
+  .cola-num span { display: block; font-size: .8rem; color: var(--muted); font-weight: 600; margin-top: 4px; }
+  .vacio { color: var(--muted); font-style: italic; font-size: .9rem; }
+  .huerfanas { color: var(--bad); font-weight: 600; font-size: .92rem; }
+  .aviso { min-height: 1.5em; font-size: .95rem; color: var(--muted); }
+  .aviso.error { color: var(--bad); font-weight: 600; }
+  .ayuda { font-size: .88rem; color: var(--muted); }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: .85em; background: var(--surface); }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>M2 (Clientes) → RabbitMQ → M3 (Conductores)</h1>
+    <button class="switch" id="paso" aria-pressed="false">Modo paso a paso: apagado</button>
+  </div>
+
+  <div class="acciones">
+    <button class="pri" id="cal">Calificar (con outbox)</button>
+    <button id="sin">Calificar sin outbox</button>
+    <button id="dup">Forzar duplicado del último publicado</button>
+    <button id="reset" class="peligro">Empezar de cero</button>
+  </div>
+  <div class="aviso" id="aviso" aria-live="polite"></div>
+
+  <section class="pausa" id="pausa" aria-live="polite"></section>
+
+  <div class="veredicto" id="veredicto"></div>
+
+  <div class="columnas">
+    <section class="col m2">
+      <h2>M2 (Clientes) · PostgreSQL</h2>
+      <div class="kv"><span>Calificaciones guardadas</span><b id="guardadas">–</b></div>
+      <div class="sub">Outbox (últimos eventos)</div>
+      <div class="lista" id="outbox"></div>
+      <div class="huerfanas" id="huerfanas"></div>
+    </section>
+    <section class="col cola" id="colCola">
+      <h2>RabbitMQ <span class="pill" id="estadoCola">arriba</span></h2>
+      <div class="cola-num">
+        <div><b class="grande" id="ready">–</b><span>Ready (esperando)</span></div>
+        <div><b class="grande" id="unacked">–</b><span>Unacked (entregado sin ACK)</span></div>
+      </div>
+      <p class="ayuda">El worker toma de a un mensaje (prefetch_count=1). Desaparece de la cola recién con el ACK.</p>
+    </section>
+    <section class="col m3">
+      <h2>M3 (Conductores) · Worker</h2>
+      <div class="kv"><span>Calificaciones contadas</span><b id="contadas">–</b></div>
+      <div class="kv"><span>Eventos procesados</span><b id="procesados">–</b></div>
+      <div class="sub">Reputación</div>
+      <div class="lista" id="reputacion"></div>
+    </section>
+  </div>
+
+  <p class="ayuda">Con el modo paso a paso activo, el relay y el worker se detienen en 4 momentos:
+    <b>1</b> evento PENDIENTE sin publicar · <b>2</b> publicado pero sin marcar PUBLICADO ·
+    <b>3</b> recibido por el worker (Unacked) · <b>4</b> sumado (COMMIT) pero sin ACK.
+    <kbd>Espacio</kbd> avanza la pausa más antigua.</p>
+</main>
+
+<script>
+const PUNTAJES = [5, 4, 5, 3, 4];
+let estado = null;
+const $ = (id) => document.getElementById(id);
+
+function avisar(texto, error = false) {
+  const a = $("aviso"); a.textContent = texto; a.className = "aviso" + (error ? " error" : "");
+}
+
+async function pedir(metodo, url, cuerpo) {
+  const opciones = { method: metodo, headers: { "Content-Type": "application/json" } };
+  if (cuerpo) opciones.body = JSON.stringify(cuerpo);
+  const r = await fetch(url, opciones);
+  let datos = {};
+  try { datos = await r.json(); } catch (e) {}
+  return { status: r.status, datos };
+}
+
+function nuevaCalificacion() {
+  const n = estado ? estado.m2.calificaciones_guardadas : 0;
+  return { viaje_id: "viaje_" + Date.now(), conductor_id: "conductor_carlos", puntaje: PUNTAJES[n % PUNTAJES.length] };
+}
+
+$("cal").onclick = async () => {
+  const c = nuevaCalificacion();
+  const r = await pedir("POST", "/calificaciones", c);
+  if (r.status === 202) avisar(`202 Accepted · calificación #${r.datos.calificacion_id} (${c.puntaje} estrellas) y evento #${r.datos.evento_outbox_id} guardados en la misma transacción.`);
+  else avisar(`${r.status} · ${r.datos.detail || "error"}`, true);
+  actualizar();
+};
+$("sin").onclick = async () => {
+  const c = nuevaCalificacion();
+  const r = await pedir("POST", "/calificaciones/sin-outbox", c);
+  if (r.status === 202) avisar(`202 · calificación #${r.datos.calificacion_id} guardada y publicada directo, sin outbox.`);
+  else avisar(`${r.status} · ${r.datos.detail || "error"}`, true);
+  actualizar();
+};
+$("dup").onclick = async () => {
+  const ev = estado && estado.m2.ultimos_eventos.find((e) => e.estado === "PUBLICADO");
+  if (!ev) { avisar("No hay eventos PUBLICADO todavía.", true); return; }
+  const r = await pedir("POST", `/calificaciones/${ev.calificacion_id}/forzar-duplicado`);
+  avisar(r.status === 200 ? `Evento #${ev.evento_id} vuelve a PENDIENTE: el relay lo va a publicar otra vez.` : `${r.status} · ${r.datos.detail || "error"}`, r.status !== 200);
+  actualizar();
+};
+let confirmarReset = null;
+$("reset").onclick = async () => {
+  const b = $("reset");
+  if (!confirmarReset) {  // primer clic: pide confirmación en el mismo botón
+    b.textContent = "¿Seguro? Borra todo. Clic de nuevo"; b.classList.add("confirmar");
+    confirmarReset = setTimeout(() => { b.textContent = "Empezar de cero"; b.classList.remove("confirmar"); confirmarReset = null; }, 4000);
+    return;
+  }
+  clearTimeout(confirmarReset); confirmarReset = null;
+  b.textContent = "Empezar de cero"; b.classList.remove("confirmar");
+  const r = await pedir("POST", "/demo/reiniciar");
+  avisar(r.status === 200 ? `Demo reiniciada: datos borrados, cola ${r.datos.cola}. Modo paso a paso apagado.` : `${r.status} · ${r.datos.detail || "error"}`, r.status !== 200);
+  actualizar();
+};
+$("paso").onclick = async () => {
+  const activo = !(estado && estado.paso_a_paso);
+  await pedir("POST", `/demo/paso-a-paso?activo=${activo}`);
+  actualizar();
+};
+async function avanzar(servicio) {
+  const r = await pedir("POST", "/demo/avanzar" + (servicio ? `?servicio=${servicio}` : ""));
+  if (r.status !== 200) avisar(r.datos.detail || "No hay nada esperando.", true);
+  setTimeout(actualizar, 300);
+}
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !e.repeat) { e.preventDefault(); avanzar(); }
+});
+
+function pintarPausas(d) {
+  const p = $("pausa");
+  if (!d.paso_a_paso) {
+    p.className = "pausa"; p.innerHTML = `<div class="apagado">Modo paso a paso apagado: todo corre solo.</div>`; return;
+  }
+  if (!d.pausas.length) {
+    p.className = "pausa"; p.innerHTML = `<div class="apagado">Modo paso a paso activo. Ningún servicio está esperando: calificá para empezar.</div>`; return;
+  }
+  p.className = "pausa activa";
+  p.innerHTML = d.pausas.map((x) => `<div class="fila"><span class="num">PAUSA ${x.numero} · ${x.servicio.toUpperCase()}</span>
+      <span class="desc">${x.descripcion}</span>
+      <button class="avanzar" data-s="${x.servicio}">Avanzar</button></div>`).join("");
+  p.querySelectorAll("button").forEach((b) => (b.onclick = () => avanzar(b.dataset.s)));
+}
+
+function pintar(d) {
+  estado = d;
+  $("paso").setAttribute("aria-pressed", d.paso_a_paso);
+  $("paso").textContent = "Modo paso a paso: " + (d.paso_a_paso ? "ACTIVO" : "apagado");
+  pintarPausas(d);
+
+  $("guardadas").textContent = d.m2.calificaciones_guardadas;
+  $("outbox").innerHTML = d.m2.ultimos_eventos.length
+    ? d.m2.ultimos_eventos.map((e) => `<div class="ev ${e.estado}"><span>evento #${e.evento_id} · calif. #${e.calificacion_id}</span><span>${e.estado}</span></div>`).join("")
+    : `<span class="vacio">vacío</span>`;
+  const h = d.m2.calificaciones_huerfanas_sin_outbox;
+  $("huerfanas").textContent = h.length ? `Sin evento en el outbox (guardadas sin outbox): #${h.join(", #")}` : "";
+
+  const q = d.rabbitmq;
+  $("colCola").classList.toggle("caido", !q.disponible);
+  $("estadoCola").textContent = q.disponible ? "arriba" : "caído";
+  $("ready").textContent = q.ready ?? "–";
+  $("unacked").textContent = q.unacked ?? "–";
+
+  $("contadas").textContent = d.m3.calificaciones_contadas;
+  $("procesados").textContent = d.m3.eventos_procesados;
+  $("reputacion").innerHTML = d.m3.reputacion.length
+    ? d.m3.reputacion.map((r) => `<div class="kv"><span>${r.conductor_id}</span><b>${r.promedio.toFixed(2)} <small>(${r.cantidad})</small></b></div>`).join("")
+    : `<span class="vacio">todavía no sumó ninguna</span>`;
+
+  const g = d.m2.calificaciones_guardadas, c = d.m3.calificaciones_contadas;
+  const enCamino = (d.m2.outbox.PENDIENTE || 0) + (q.ready || 0) + (q.unacked || 0);
+  const v = $("veredicto");
+  let clase, texto;
+  const perdidas = h.length ? Math.max(0, g - c - enCamino) : 0;
+  const camino = enCamino ? ` · ${enCamino} en camino (outbox o cola)` : "";
+  if (g === c) { clase = "ok"; texto = "Coinciden: nada perdido y nada contado dos veces."; }
+  else if (c > g) { clase = "mal"; texto = "Más contadas que guardadas: se contó un duplicado."; }
+  else if (perdidas) { clase = "mal"; texto = `${perdidas} que M3 nunca va a recibir: evento perdido (sin outbox)${camino}.`; }
+  else { clase = "espera"; texto = `Todavía no coinciden${camino || ": hay eventos en camino"}.`; }
+  v.className = "veredicto " + clase;
+  v.innerHTML = `<span class="nums">guardadas en M2: ${g} · contadas en M3: ${c}</span><span>${texto}</span>`;
+}
+
+async function actualizar() {
+  try {
+    const r = await fetch("/resumen");
+    if (!r.ok) throw new Error(r.status);
+    pintar(await r.json());
+  } catch (e) {
+    avisar("No se pudo leer el estado (¿está levantada la API y la base?).", true);
+  }
+}
+actualizar();
+setInterval(actualizar, 1000);
+</script>
+</body>
+</html>

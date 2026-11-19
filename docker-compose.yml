@@ -18,6 +18,9 @@ services:
   broker:
     image: rabbitmq:3-management-alpine
     hostname: broker
+    environment:
+      # La consola actualiza los contadores Ready/Unacked cada 1 s (por defecto son 5 s)
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit collect_statistics_interval 1000"
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -25,6 +28,7 @@ services:
   api:
     build: .
     command: uvicorn api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
     ports:
       - "8000:8000"
     depends_on:
@@ -34,6 +38,7 @@ services:
   relay:
     build: .
     command: python -u relay.py
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -43,6 +48,9 @@ services:
   worker:
     build: .
     command: python -u worker.py
+    restart: unless-stopped
+    environment:
+      TIEMPO_PROCESAMIENTO: "5"  # segundos que tarda en procesar cada calificación
     depends_on:
       db:
         condition: service_healthy
