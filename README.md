@@ -4,6 +4,8 @@
 Trabajo Práctico Integrador (TPI) · Plataforma de Movilidad Urbana.  
 **Tema:** Colas de mensajes y procesamiento asíncrono (Tema 2) y Patrón Transactional Outbox (Tema 27).
 
+**Documento de investigación:** [documento-investigacion.pdf](documento-investigacion.pdf)
+
 ---
 
 ## 1. Investigación Conceptual
