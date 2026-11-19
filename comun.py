@@ -3,6 +3,7 @@ import psycopg2
 import pika
 
 COLA_M2 = "cola_calificaciones_m2"
+COLA_DLQ = "cola_calificaciones_dlq"
 
 @contextmanager
 def transaccion_bd():
@@ -23,14 +24,26 @@ def transaccion_bd():
         conexion.close()
 
 def conectar_broker(timeout=3, heartbeat=60):
-    """Devuelve una conexión activa a RabbitMQ y su canal con la cola declarada."""
+    """Devuelve conexión y canal a RabbitMQ con la cola principal y su Dead Letter Queue."""
     parametros = pika.ConnectionParameters(
         host="broker", port=5672,
         connection_attempts=1, socket_timeout=timeout, heartbeat=heartbeat
     )
     conexion = pika.BlockingConnection(parametros)
     canal = conexion.channel()
-    canal.queue_declare(queue=COLA_M2, durable=True)
+
+    # 1. Cola de mensajes muertos (DLQ) para mensajes corruptos / Poison Pills
+    canal.queue_declare(queue=COLA_DLQ, durable=True)
+
+    # 2. Cola principal enlazada a la DLQ (usa el exchange por defecto "")
+    canal.queue_declare(
+        queue=COLA_M2,
+        durable=True,
+        arguments={
+            "x-dead-letter-exchange": "",
+            "x-dead-letter-routing-key": COLA_DLQ
+        }
+    )
     return conexion, canal
 
 def log_flujo(calificacion_id, paso, direccion, mensaje):

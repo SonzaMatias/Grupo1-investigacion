@@ -1,19 +1,33 @@
-CREATE TABLE calificaciones (
+CREATE SCHEMA IF NOT EXISTS m2;
+
+CREATE TABLE IF NOT EXISTS m2.calificaciones (
     id SERIAL PRIMARY KEY,
-    viaje_id VARCHAR(50) NOT NULL,
-    cliente_id VARCHAR(50) NOT NULL,
-    conductor_id VARCHAR(50) NOT NULL,
-    puntaje INTEGER NOT NULL CHECK (puntaje BETWEEN 1 AND 5),
-    comentario TEXT,
-    estado VARCHAR(30) NOT NULL,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    viaje VARCHAR(20) NOT NULL,
+    cliente VARCHAR(20) NOT NULL,
+    conductor VARCHAR(20) NOT NULL,
+    puntaje INT NOT NULL CHECK (puntaje BETWEEN 1 AND 5),
+    hora TIME(0) DEFAULT CURRENT_TIME
 );
 
-CREATE TABLE outbox_eventos (
+CREATE TABLE IF NOT EXISTS m2.outbox_eventos (
     id SERIAL PRIMARY KEY,
-    calificacion_id INTEGER NOT NULL,
-    tipo_evento VARCHAR(50) NOT NULL,
-    payload TEXT NOT NULL,
-    estado VARCHAR(30) NOT NULL,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    calif_id INT NOT NULL REFERENCES m2.calificaciones(id),
+    evento VARCHAR(30) NOT NULL,
+    estado VARCHAR(15) NOT NULL DEFAULT 'PENDIENTE',
+    payload TEXT NOT NULL
+);
+
+CREATE SCHEMA IF NOT EXISTS m3;
+
+CREATE TABLE IF NOT EXISTS m3.inbox_eventos (
+    calif_id INT PRIMARY KEY,
+    procesado TIME(0) DEFAULT CURRENT_TIME
+);
+
+CREATE TABLE IF NOT EXISTS m3.conductores_reputacion (
+    conductor VARCHAR(20) PRIMARY KEY,
+    cant INT NOT NULL DEFAULT 0,
+    suma INT NOT NULL DEFAULT 0,
+    promedio NUMERIC(3, 2) NOT NULL DEFAULT 0.00,
+    actualizado TIME(0) DEFAULT CURRENT_TIME
 );
